@@ -1,0 +1,2691 @@
+{
+  "name": "Job Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -1104,
+        -720
+      ],
+      "id": "056071d4-950f-42ad-958a-c54cf5ac5674",
+      "name": "When chat message received"
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an intent classifier for a job tracking workflow.\n\nClassify the user's entire message as exactly one of these two values:\n\nADD_JOB\nUPDATE_STATUS\n\nIMPORTANT PRIORITY RULE\n\nFirst determine whether the message is a job advertisement or job description.\n\nIf the message contains a job listing, job description, responsibilities, requirements, qualifications, benefits, company information, role description, or similar recruitment content, ALWAYS classify it as:\n\nADD_JOB\n\nThis rule has priority over all other rules.\n\nWords such as:\n- apply\n- application\n- interview\n- testing\n- support\n- assessment\n\nmay appear naturally inside a job advertisement. Their presence alone does NOT make the message an UPDATE_STATUS.\n\nUse ADD_JOB when:\n- the user pasted a full or partial job advertisement\n- the message describes an available role\n- the message contains sections such as Job Description, About the Role, Responsibilities, Requirements, Qualifications, Benefits, Pre-requisite, or About Us\n- the message includes a job title and company together with details about the role\n- the user is adding a new job opportunity\n\nExamples:\n\n\"AI Software R&D Engineer\nAxiom IT Solutions\nAbout the role...\nKey responsibilities...\nPre-requisite...\"\n→ ADD_JOB\n\n\"Software Engineer\nCompany ABC\nRequirements:\nPython, SQL, REST API...\"\n→ ADD_JOB\n\nUse UPDATE_STATUS only when the user's message is primarily a personal update about an EXISTING job or application.\n\nExamples:\n\n\"Applied to Sunway\"\n→ UPDATE_STATUS\n\n\"I submitted the Axiom assessment\"\n→ UPDATE_STATUS\n\n\"I got an interview with Lenovo\"\n→ UPDATE_STATUS\n\n\"Sunway rejected me\"\n→ UPDATE_STATUS\n\n\"I got an offer from CompAsia\"\n→ UPDATE_STATUS\n\n\"I withdrew my application to Axiom\"\n→ UPDATE_STATUS\n\nDo NOT classify a job advertisement as UPDATE_STATUS merely because the advertisement contains words such as \"apply\", \"application\", \"interview\", \"assessment\", \"testing\", or \"support\".\n\nReturn ONLY one of these exact values:\n\nADD_JOB\n\nor\n\nUPDATE_STATUS\n\nDo not return JSON.\nDo not explain your answer.\nDo not add punctuation."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -928,
+        -720
+      ],
+      "id": "6e66c652-2f2a-47e7-b762-5acfbec6af3d",
+      "name": "Classify Intent"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        -544
+      ],
+      "id": "e94b195f-a7e6-4386-85eb-b9cfd7832ec5",
+      "name": "Intent Model"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "ADD_JOB",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "fe098311-57f3-4930-bc08-fd6e1ca90747"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b4b6df22-6b43-44a9-be83-51d53e32eea8",
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "UPDATE_STATUS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -624,
+        -720
+      ],
+      "id": "22eadf30-7090-4986-92f6-cf1fa3a89f7d",
+      "name": "Route Intent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=JOB ADVERTISEMENT:\n\n{{ $('When chat message received').item.json.chatInput }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a strict job advertisement information extractor.\n\nYou will receive a job advertisement or job description.\n\nExtract only factual information explicitly present in the provided text.\n\nDo not guess.\nDo not infer missing facts.\nDo not invent company information.\nDo not use outside knowledge.\n\nReturn valid JSON only.\n\nExtract:\n\ncompany\n- Company or employer name.\n- Return null if not clearly stated.\n\njob_title\n- Advertised role title.\n- Return null if not clearly stated.\n\nlocation\n- Job location only if explicitly stated.\n- Return null if not stated.\n\nsalary\n- Salary exactly as stated.\n- Preserve ranges and currency.\n- Return null if not stated.\n\nwork_type\n- Use On-site, Hybrid, or Remote only if explicitly stated.\n- Return null if unclear or not stated.\n\nemployment_type\n- Examples: Full-time, Part-time, Contract, Internship, Temporary, Graduate Programme.\n- Return null if not stated.\n\ndate_posted\n- Extract the stated posting date or relative age.\n- Examples: \"Posted 24d ago\", \"12 September 2026\".\n- Return null if not stated.\n\njob_url\n- Return a URL only if one appears in the supplied input.\n- Otherwise return null.\n\nReturn exactly this JSON structure:\n\n{\n  \"company\": null,\n  \"job_title\": null,\n  \"location\": null,\n  \"salary\": null,\n  \"work_type\": null,\n  \"employment_type\": null,\n  \"date_posted\": null,\n  \"job_url\": null\n}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -272,
+        -976
+      ],
+      "id": "3323c190-15db-4f98-aadf-fd57bbe78eac",
+      "name": "Extract Job Details"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {
+          "temperature": 0.1,
+          "numPredict": 1000,
+          "format": "json"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -800
+      ],
+      "id": "c425c119-09df-4ee3-bd33-d1011ef250be",
+      "name": "Job Extraction Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.text ?? $json.output ?? $json.response ?? $json;\n\n// If Ollama returned a JSON string, parse it.\nif (typeof raw === \"string\") {\n  raw = raw\n    .replace(/^```json\\s*/i, \"\")\n    .replace(/^```\\s*/i, \"\")\n    .replace(/\\s*```$/i, \"\")\n    .trim();\n\n  raw = JSON.parse(raw);\n}\n\nfunction normalizeText(value) {\n  if (!value) return null;\n\n  return value\n    .toLowerCase()\n    .replace(/[^\\p{L}\\p{N}\\s]/gu, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nreturn [\n  {\n    json: {\n      ...raw,\n      company_normalized: normalizeText(raw.company),\n      job_title_normalized: normalizeText(raw.job_title),\n      jd_text: $('When chat message received').item.json.chatInput\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -1136
+      ],
+      "id": "550ff63b-62cd-44ae-88d9-2f38b38251ae",
+      "name": "Normalize Job Fields"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_normalized",
+              "keyValue": "={{ $json.company_normalized }}"
+            },
+            {
+              "keyName": "job_title_normalized",
+              "keyValue": "={{ $json.job_title_normalized }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        -1136
+      ],
+      "id": "726683af-4c4f-41b9-b3b4-4f7dd369ad53",
+      "name": "Find Duplicate Job",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e6e613f2-34b6-4eec-b93a-79edef4ddd12",
+              "leftValue": "={{ $json.id !== undefined && $json.id !== null }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -1136
+      ],
+      "id": "a1ac214f-5bb6-4c6a-81f9-a93211535ebc",
+      "name": "Duplicate Found?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ Number($json.id) }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "seen_count": "={{ Number($json.seen_count) + 1 }}",
+            "last_seen": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "jd_text",
+              "displayName": "jd_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "entry_state",
+              "displayName": "entry_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "missing_fields",
+              "displayName": "missing_fields",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "company_normalized",
+              "displayName": "company_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title_normalized",
+              "displayName": "job_title_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -1232
+      ],
+      "id": "59f9a2e7-1f37-458e-845f-32589582c5e2",
+      "name": "Update Duplicate Seen Count"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Job Application Tracker"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tracker_id": "={{ $json.id }}",
+            "seen_count": "={{ $json.seen_count }}",
+            "last_seen": "={{ $json.last_seen }}"
+          },
+          "matchingColumns": [
+            "tracker_id"
+          ],
+          "schema": [
+            {
+              "id": "tracker_id",
+              "displayName": "tracker_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        848,
+        -1232
+      ],
+      "id": "a7ac7ab2-7041-4385-9c66-2f96c588f49b",
+      "name": "Sync Duplicate To Sheet"
+    },
+    {
+      "parameters": {
+        "message": "=This job already exists in your tracker.\n\nCompany: {{ $json.company }}\nJob: {{ $json.job_title }}\nSeen count: {{ $json.seen_count }}\n\nI've updated the last seen date.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        1024,
+        -1232
+      ],
+      "id": "0a964e3e-18cd-49e2-94dd-9f96bece0ef1",
+      "name": "Send Duplicate Notice"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Normalize Job Fields').item.json;\n\nconst fieldsToCheck = [\n  \"location\",\n  \"salary\",\n  \"work_type\",\n  \"employment_type\",\n  \"job_url\"\n];\n\nconst missingFields = [];\n\nfor (const field of fieldsToCheck) {\n  const value = data[field];\n\n  if (value === null || value === undefined || value === \"\") {\n    missingFields.push(field);\n  }\n}\n\nreturn [\n  {\n    json: {\n      ...data,\n      missing_fields: missingFields\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -896
+      ],
+      "id": "e2a560f3-3c55-4b9b-ab8e-3cb85eaae276",
+      "name": "Find Missing Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst labels = {\n  location: \"Location\",\n  salary: \"Salary\",\n  work_type: \"Work Type\",\n  employment_type: \"Employment Type\",\n  job_url: \"Job URL\"\n};\n\nlet message = `I found the job details for ${data.job_title} at ${data.company}.\\n\\n`;\n\nif (data.missing_fields.length > 0) {\n  message += \"I’m missing the following information:\\n\";\n\n  for (const field of data.missing_fields) {\n    message += `- ${labels[field]}\\n`;\n  }\n\n  message += \"\\nPlease provide anything you know. If you don’t know a field, type `skip` for it.\";\n} else {\n  message += \"All required tracker information is available.\";\n}\n\nreturn [\n  {\n    json: {\n      ...data,\n      clarification_message: message\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -896
+      ],
+      "id": "06e1b91e-1cd0-4e3d-b3fb-a7c6a82d2ad4",
+      "name": "Build Missing Info Prompt"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{ $json.company }}",
+            "job_title": "={{ $json.job_title }}",
+            "location": "={{ $json.location }}",
+            "salary": "={{ $json.salary }}",
+            "work_type": "={{ $json.work_type }}",
+            "employment_type": "={{ $json.employment_type }}",
+            "date_posted": "={{ $json.date_posted }}",
+            "job_url": "={{ $json.job_url }}",
+            "jd_text": "={{ $('When chat message received').item.json.chatInput }}",
+            "date_found": "={{ $now }}",
+            "last_seen": "={{ $now }}",
+            "seen_count": 1,
+            "status": "=Interested",
+            "last_update": "={{ $now }}",
+            "notes": "={{ null }}",
+            "entry_state": "PENDING",
+            "missing_fields": "={{ JSON.stringify($json.missing_fields) }}",
+            "company_normalized": "={{ $('Normalize Job Fields').item.json.company_normalized }}",
+            "job_title_normalized": "={{ $('Normalize Job Fields').item.json.job_title_normalized }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "jd_text",
+              "displayName": "jd_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "entry_state",
+              "displayName": "entry_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "missing_fields",
+              "displayName": "missing_fields",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "company_normalized",
+              "displayName": "company_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title_normalized",
+              "displayName": "job_title_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        -896
+      ],
+      "id": "568a5e0f-5c32-48e4-a9db-41d92065aa97",
+      "name": "Create Pending Job"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "={{ $('Build Missing Info Prompt').first().json.clarification_message }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        -672
+      ],
+      "id": "0653a5c8-3a52-4f78-9429-e964fabc69a7",
+      "name": "Ask For Missing Info"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.response || $json.chatInput || $json.text || \"\";\n\nconst updates = {};\n\nconst lines = response.split(\"\\n\");\n\nfor (const line of lines) {\n  const parts = line.split(\":\");\n  if (parts.length < 2) continue;\n\n  const key = parts[0].trim().toLowerCase();\n  const value = parts.slice(1).join(\":\").trim();\n\n  if (!value) continue;\n\n  const normalizedValue =\n    value.toLowerCase() === \"skip\" ? null : value;\n\n  if (key === \"location\") {\n    updates.location = normalizedValue;\n  }\n\n  if (key === \"salary\") {\n    updates.salary = normalizedValue;\n  }\n\n  if (key === \"work type\") {\n    updates.work_type = normalizedValue;\n  }\n\n  if (key === \"employment type\") {\n    updates.employment_type = normalizedValue;\n  }\n\n  if (key === \"job url\") {\n    updates.job_url = normalizedValue;\n  }\n}\n\nreturn [\n  {\n    json: {\n      ...updates\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -672
+      ],
+      "id": "68094180-e0f0-444c-ac43-9f64493e0821",
+      "name": "Parse Missing Info Reply"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Create Pending Job').item.json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "location": "={{ $json.location }}",
+            "salary": "={{ $json.salary }}",
+            "work_type": "={{ $json.work_type }}",
+            "employment_type": "={{ $json.employment_type }}",
+            "job_url": "={{ $json.job_url }}",
+            "entry_state": "COMPLETE",
+            "missing_fields": "[]",
+            "last_update": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "jd_text",
+              "displayName": "jd_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "entry_state",
+              "displayName": "entry_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "missing_fields",
+              "displayName": "missing_fields",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        -672
+      ],
+      "id": "da2446ff-3424-4c73-9257-03413a8c8056",
+      "name": "Complete Job Record"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Job Application Tracker"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tracker_id": "={{ $json.id }}",
+            "company": "={{ $json.company }}",
+            "job_title": "={{ $json.job_title }}",
+            "location": "={{ $json.location }}",
+            "salary": "={{ $json.salary }}",
+            "work_type": "={{ $json.work_type }}",
+            "employment_type": "={{ $json.employment_type }}",
+            "date_posted": "={{ $json.date_posted }}",
+            "date_found": "={{ $json.date_found }}",
+            "last_seen": "={{ $json.last_seen }}",
+            "seen_count": "={{ $json.seen_count }}",
+            "status": "={{ $json.status }}",
+            "application_date": "={{ $json.application_date }}",
+            "last_update": "={{ $json.last_update }}",
+            "job_url": "={{ $json.job_url }}",
+            "notes": "={{ $json.notes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tracker_id",
+              "displayName": "tracker_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        -672
+      ],
+      "id": "2a4c06e7-e153-48ad-8681-411b74ac59c7",
+      "name": "Add Job To Sheet"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You extract status-update information for a job tracker.\n\nThe user will send a short message about an existing job application.\n\nExtract:\n\ncompany\n- Extract the company or employer being referred to.\n- IMPORTANT: Preserve the company name exactly as written by the user.\n- Do not correct spelling.\n- Do not change capitalization.\n- Do not expand abbreviated company names.\n- Do not add or remove letters.\n- The company may appear anywhere in the sentence.\n- Examples:\n  - \"Applied to Sunway\" → company = \"Sunway\"\n  - \"applied to compasia\" → company = \"compasia\"\n  - \"I got an assessment from Axiom\" → company = \"Axiom\"\n  - \"I submitted the Lenovo assessment\" → company = \"Lenovo\"\n- Return null only if no company can reasonably be identified from the user's words.\n\njob_title\n- Extract the job title if explicitly stated.\n- Preserve it as written by the user where possible.\n- Return null if it is not stated.\n\nstatus\n- Return exactly one of:\n  Interested\n  Applied\n  Reply Received\n  Assessment Received\n  Assessment Submitted\n  Interview\n  Offer\n  Rejected\n  Withdrawn\n\nnotes\n- Extract useful extra information that is not already represented by company, job title, or status.\n- Return null if there is no useful extra detail.\n\nSTATUS RULES\n\n- \"Applied to...\" or equivalent → Applied\n- \"They replied\", \"I received a reply\", or equivalent → Reply Received\n- \"I got an assessment\", \"they sent an assessment\", or equivalent → Assessment Received\n- \"I submitted the assessment\", \"finished the assessment\", \"sent my assessment\", or equivalent → Assessment Submitted\n- \"I got an interview\", \"interview scheduled\", or equivalent → Interview\n- \"I got an offer\" or equivalent → Offer\n- \"Rejected\", \"didn't get the role\", or equivalent → Rejected\n- \"I withdrew\", \"withdrew my application\", or equivalent → Withdrawn\n\nDo not invent company names.\nDo not correct company names.\nDo not use outside knowledge.\nDo not infer missing job titles.\n\nReturn only valid JSON in exactly this shape:\n\n{\n  \"company\": null,\n  \"job_title\": null,\n  \"status\": \"Applied\",\n  \"notes\": null\n}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -608,
+        -192
+      ],
+      "id": "183cb784-2646-4031-bb42-4af1c34fe6c2",
+      "name": "Extract Status Update"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        -16
+      ],
+      "id": "3c4733dd-f9bf-480d-b2a3-69a3480125e5",
+      "name": "Status Extraction Model"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d96558ef-b1fc-44e8-aa9e-2cf2f7f35746",
+              "name": "company",
+              "value": "={{ JSON.parse($json.text).company }}",
+              "type": "string"
+            },
+            {
+              "id": "9d193194-2331-4710-b076-df9c3480155f",
+              "name": "job_title",
+              "value": "={{ JSON.parse($json.text).job_title }}",
+              "type": "string"
+            },
+            {
+              "id": "b0164e45-574c-454f-b3f0-10329f303c04",
+              "name": "status",
+              "value": "={{ JSON.parse($json.text).status }}",
+              "type": "string"
+            },
+            {
+              "id": "3d046a2f-1d24-49c6-b878-3de38384e2ec",
+              "name": "notes",
+              "value": "={{ JSON.parse($json.text).notes }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -272,
+        -192
+      ],
+      "id": "f241de9a-f2a5-45dc-8a17-54c7e634a330",
+      "name": "Parse Status Fields"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company",
+              "condition": "ilike",
+              "keyValue": "={{ $json.company }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        368,
+        -208
+      ],
+      "id": "0a9a8f43-33c2-4264-b1c2-040b0d20e25a",
+      "name": "Find Job For Status"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ Number($json.id) }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $('Parse Status Fields').item.json.status }}",
+            "last_update": "={{ $now }}",
+            "notes": "={{ $('Parse Status Fields').first().json.notes ?? $json.notes }}",
+            "application_date": "={{ $('Parse Status Fields').first().json.status === 'Applied' && !$json.application_date ? $now : $json.application_date }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "jd_text",
+              "displayName": "jd_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "entry_state",
+              "displayName": "entry_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "missing_fields",
+              "displayName": "missing_fields",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "company_normalized",
+              "displayName": "company_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "job_title_normalized",
+              "displayName": "job_title_normalized",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1216,
+        -224
+      ],
+      "id": "51b65d58-483e-40cf-8200-b48bd17842ac",
+      "name": "Update Job Status"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Job Application Tracker"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "application_date": "={{ $json.application_date }}",
+            "last_update": "={{ $json.last_update }}",
+            "notes": "={{ $json.notes }}",
+            "seen_count": "={{ $json.seen_count }}",
+            "last_seen": "={{ $json.last_seen }}",
+            "tracker_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "tracker_id"
+          ],
+          "schema": [
+            {
+              "id": "tracker_id",
+              "displayName": "tracker_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "location",
+              "displayName": "location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "salary",
+              "displayName": "salary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "work_type",
+              "displayName": "work_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "employment_type",
+              "displayName": "employment_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date_posted",
+              "displayName": "date_posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date_found",
+              "displayName": "date_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seen_count",
+              "displayName": "seen_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "application_date",
+              "displayName": "application_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_update",
+              "displayName": "last_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "job_url",
+              "displayName": "job_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1392,
+        -224
+      ],
+      "id": "a0a89737-af6d-4a11-89de-a72725c52563",
+      "name": "Sync Status To Sheet"
+    },
+    {
+      "parameters": {
+        "message": "=Updated job status.\n\nCompany: {{ $json.company }}\nJob: {{ $json.job_title }}\nStatus: {{ $json.status }}\nLast updated: {{ $json.last_update }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        -224
+      ],
+      "id": "95c11b22-b722-4c75-8359-36d8af7f5633",
+      "name": "Send Status Confirmation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb5819e7-784d-4e63-b72a-909820cfd318",
+              "leftValue": "={{ $json.company !== null || $json.job_title !== null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -96,
+        -192
+      ],
+      "id": "d4e52f5d-7fde-4d36-a1bb-7f87308f912f",
+      "name": "Job Identity Provide?"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "Which company or job is this update for?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        48,
+        -80
+      ],
+      "id": "77016924-0a27-4e3c-9b33-e81044b296af",
+      "name": "Ask Which Job"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9c37342a-f0cb-48a7-b234-4a8dba5a7dc8",
+              "name": "company",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "4aada0bc-e0a0-4902-8edf-e6a9d4f221c5",
+              "name": "job_title",
+              "value": "={{ $('Parse Status Fields').item.json.job_title }}",
+              "type": "string"
+            },
+            {
+              "id": "9c4574b7-67a9-4561-af6e-f889eda138a9",
+              "name": "status",
+              "value": "={{ $('Parse Status Fields').item.json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "20c5228a-c95a-4d0c-b659-9254c361d041",
+              "name": "notes",
+              "value": "={{ $('Parse Status Fields').item.json.notes }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        -80
+      ],
+      "id": "015171ef-f4cd-4d53-97da-47dbec74c80d",
+      "name": "Combine Clarified Job"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "I found multiple applications for this company.\n\nWhich role do you mean?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        16
+      ],
+      "id": "b6f73486-4fe7-402b-840f-d245a7813535",
+      "name": "Ask Which Role"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9cc03f2c-5c9a-4b1d-b31f-d1924515441a",
+              "name": "company",
+              "value": "={{ $('Parse Status Fields').item.json.company }}",
+              "type": "string"
+            },
+            {
+              "id": "329491cc-2d9a-4c53-b349-29436174975d",
+              "name": "job_title",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "0be30f92-c07d-4bab-8e6b-731574aafd74",
+              "name": "status",
+              "value": "={{ $('Parse Status Fields').item.json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "5abcd523-539d-4342-80a7-02d3029511d5",
+              "name": "notes",
+              "value": "={{ $('Parse Status Fields').item.json.notes }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        624,
+        16
+      ],
+      "id": "4e5bab0a-e35f-4d00-8a02-0dda38d8ec21",
+      "name": "Combine Selected Role"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "034ad84b-c854-4016-ba82-393612d780ce",
+              "leftValue": "={{ $items(\"Find Job For Status\").length === 1 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        -208
+      ],
+      "id": "411107d8-b556-43a9-a0b6-c73cd4cca15d",
+      "name": "Single Match?"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATA_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "job_tracker"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company",
+              "condition": "ilike",
+              "keyValue": "={{ $json.company }}"
+            },
+            {
+              "keyName": "job_title",
+              "condition": "ilike",
+              "keyValue": "={{ $json.job_title }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        16
+      ],
+      "id": "10e67485-81db-45f3-b5fe-aea04828f872",
+      "name": "Find Specific Job",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3166863b-85db-482f-9c21-49a5e62f625b",
+              "leftValue": "={{ $json.id !== undefined && $json.id !== null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        16
+      ],
+      "id": "c1581093-da7a-4509-be13-2753ae12ea1c",
+      "name": "Specific Job Found?"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "I couldn't find that role for this company.\n\nPlease enter the role name again as it appears in your tracker.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        32
+      ],
+      "id": "b829dbdb-d1de-4655-a556-b2312b93accb",
+      "name": "Specific Job Not Found"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Classify Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Intent": {
+      "main": [
+        [
+          {
+            "node": "Route Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Intent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Intent": {
+      "main": [
+        [
+          {
+            "node": "Extract Job Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Status Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Job Details": {
+      "main": [
+        [
+          {
+            "node": "Normalize Job Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job Extraction Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Job Details",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Job Fields": {
+      "main": [
+        [
+          {
+            "node": "Find Duplicate Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Duplicate Job": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Found?": {
+      "main": [
+        [
+          {
+            "node": "Update Duplicate Seen Count",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Missing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Duplicate Seen Count": {
+      "main": [
+        [
+          {
+            "node": "Sync Duplicate To Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Duplicate To Sheet": {
+      "main": [
+        [
+          {
+            "node": "Send Duplicate Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Missing Fields": {
+      "main": [
+        [
+          {
+            "node": "Build Missing Info Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Missing Info Prompt": {
+      "main": [
+        [
+          {
+            "node": "Create Pending Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pending Job": {
+      "main": [
+        [
+          {
+            "node": "Ask For Missing Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask For Missing Info": {
+      "main": [
+        [
+          {
+            "node": "Parse Missing Info Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Missing Info Reply": {
+      "main": [
+        [
+          {
+            "node": "Complete Job Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete Job Record": {
+      "main": [
+        [
+          {
+            "node": "Add Job To Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Status Update": {
+      "main": [
+        [
+          {
+            "node": "Parse Status Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Extraction Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Status Update",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Status Fields": {
+      "main": [
+        [
+          {
+            "node": "Job Identity Provide?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Job For Status": {
+      "main": [
+        [
+          {
+            "node": "Single Match?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Job Status": {
+      "main": [
+        [
+          {
+            "node": "Sync Status To Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Status To Sheet": {
+      "main": [
+        [
+          {
+            "node": "Send Status Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job Identity Provide?": {
+      "main": [
+        [
+          {
+            "node": "Find Job For Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Which Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Which Job": {
+      "main": [
+        [
+          {
+            "node": "Combine Clarified Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Clarified Job": {
+      "main": [
+        [
+          {
+            "node": "Find Job For Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Which Role": {
+      "main": [
+        [
+          {
+            "node": "Combine Selected Role",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Selected Role": {
+      "main": [
+        [
+          {
+            "node": "Find Specific Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Single Match?": {
+      "main": [
+        [
+          {
+            "node": "Update Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Which Role",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Specific Job": {
+      "main": [
+        [
+          {
+            "node": "Specific Job Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Specific Job Found?": {
+      "main": [
+        [
+          {
+            "node": "Update Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Specific Job Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Specific Job Not Found": {
+      "main": [
+        [
+          {
+            "node": "Combine Selected Role",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [
+    {
+      "id": "7770e61a-dd1d-4ac7-8289-5bd6a6330180",
+      "nodeIds": [
+        "3323c190-15db-4f98-aadf-fd57bbe78eac",
+        "c425c119-09df-4ee3-bd33-d1011ef250be",
+        "550ff63b-62cd-44ae-88d9-2f38b38251ae",
+        "726683af-4c4f-41b9-b3b4-4f7dd369ad53",
+        "a1ac214f-5bb6-4c6a-81f9-a93211535ebc",
+        "59f9a2e7-1f37-458e-845f-32589582c5e2",
+        "a7ac7ab2-7041-4385-9c66-2f96c588f49b",
+        "0a964e3e-18cd-49e2-94dd-9f96bece0ef1",
+        "e2a560f3-3c55-4b9b-ab8e-3cb85eaae276",
+        "06e1b91e-1cd0-4e3d-b3fb-a7c6a82d2ad4",
+        "568a5e0f-5c32-48e4-a9db-41d92065aa97",
+        "0653a5c8-3a52-4f78-9429-e964fabc69a7",
+        "68094180-e0f0-444c-ac43-9f64493e0821",
+        "da2446ff-3424-4c73-9257-03413a8c8056",
+        "2a4c06e7-e153-48ad-8681-411b74ac59c7"
+      ],
+      "name": "ADD JOB"
+    },
+    {
+      "id": "13d105f3-e405-47a0-8f56-e9ae628f3cb7",
+      "nodeIds": [
+        "183cb784-2646-4031-bb42-4af1c34fe6c2",
+        "3c4733dd-f9bf-480d-b2a3-69a3480125e5",
+        "f241de9a-f2a5-45dc-8a17-54c7e634a330",
+        "0a9a8f43-33c2-4264-b1c2-040b0d20e25a",
+        "51b65d58-483e-40cf-8200-b48bd17842ac",
+        "a0a89737-af6d-4a11-89de-a72725c52563",
+        "95c11b22-b722-4c75-8359-36d8af7f5633",
+        "d4e52f5d-7fde-4d36-a1bb-7f87308f912f",
+        "77016924-0a27-4e3c-9b33-e81044b296af",
+        "015171ef-f4cd-4d53-97da-47dbec74c80d",
+        "b6f73486-4fe7-402b-840f-d245a7813535",
+        "4e5bab0a-e35f-4d00-8a02-0dda38d8ec21",
+        "411107d8-b556-43a9-a0b6-c73cd4cca15d",
+        "10e67485-81db-45f3-b5fe-aea04828f872",
+        "c1581093-da7a-4509-be13-2753ae12ea1c",
+        "b829dbdb-d1de-4655-a556-b2312b93accb"
+      ],
+      "name": "UPDATE STATUS"
+    }
+  ],
+  "tags": []
+}
